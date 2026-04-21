@@ -12,11 +12,26 @@ body {
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  /* Expose the real safe-area insets so native layouts can respect
+     status-bar / navigation-bar regions on both iOS and Android. */
+  --kd-safe-top: env(safe-area-inset-top, 0px);
+  --kd-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --kd-safe-left: env(safe-area-inset-left, 0px);
+  --kd-safe-right: env(safe-area-inset-right, 0px);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
 }
 
 #root {
   min-height: 100vh;
   min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 
 button {

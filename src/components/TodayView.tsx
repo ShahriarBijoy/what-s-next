@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { PALETTE, hexToRgba, MONTH_SHORT, type CalendarEvent } from '../types';
+import { PALETTE, hexToRgba, type CalendarEvent } from '../types';
 import { useWeather } from '../hooks/useWeather';
 import { ALL_WEATHER_STATES } from '../services/weather';
 
@@ -28,7 +28,7 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
 
   const [active, setActive] = useState(() => Math.min(2, Math.max(0, cards.length - 1)));
   const [mounted, setMounted] = useState(false);
-  const { weather: liveWeather } = useWeather();
+  const { weather: liveWeather, source: weatherSource, loading: weatherLoading, reload: reloadWeather } = useWeather();
   const [weatherIdx, setWeatherIdx] = useState<number | null>(null);
   const weather = weatherIdx === null ? liveWeather : ALL_WEATHER_STATES[weatherIdx];
 
@@ -86,11 +86,25 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
   }, [cards.length]);
 
   const todayNum = now.getDate();
-  const todayMon = MONTH_SHORT[now.getMonth()];
-  const shortDay = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][now.getDay()];
+  // "Apr" / "May" — title-case, used in the hero date ("21 Apr").
+  const MONTH_TITLE = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthTitle = MONTH_TITLE[now.getMonth()];
+  const FULL_DAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const fullDayName = FULL_DAY[now.getDay()];
 
   return (
-    <div style={{ padding: 0, fontFamily: 'Space Grotesk, system-ui', height: 720, position: 'relative', overflow: 'hidden' }}>
+    <div
+      style={{
+        padding: 0,
+        fontFamily: 'Space Grotesk, system-ui',
+        flex: 1,
+        minHeight: 0,
+        position: 'relative',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
       <div
         style={{
           padding: '4px 24px 0',
@@ -101,6 +115,7 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
           opacity: mounted ? 1 : 0,
           transform: mounted ? 'translateY(0)' : 'translateY(-10px)',
           transition: 'all 0.6s cubic-bezier(.2,.9,.2,1)',
+          flexShrink: 0,
         }}
       >
         <div>
@@ -122,36 +137,59 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
             style={{
               fontFamily: 'Instrument Serif, serif',
               fontSize: 68,
-              lineHeight: 0.9,
+              lineHeight: 0.95,
               letterSpacing: -2,
               color: PALETTE.ink,
               fontWeight: 400,
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 12,
             }}
           >
-            {String(todayNum).padStart(2, '0')}.{String(now.getMonth() + 1).padStart(2, '0')}
-          </div>
-          <div
-            style={{
-              fontFamily: 'Instrument Serif, serif',
-              fontSize: 38,
-              fontStyle: 'italic',
-              lineHeight: 1,
-              letterSpacing: -0.8,
-              color: PALETTE.orange,
-              marginTop: -2,
-            }}
-          >
-            {todayMon}
+            <span>{todayNum}</span>
+            <span
+              style={{
+                fontSize: 40,
+                fontStyle: 'italic',
+                letterSpacing: -0.8,
+                color: PALETTE.orange,
+                fontWeight: 400,
+              }}
+            >
+              {monthTitle}
+            </span>
           </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
           <button
             onClick={() => {
+              // If we're on the live feed and it hasn't landed (still on
+              // fallback), a tap re-requests location + weather. Otherwise
+              // step through the demo states for preview / design QA.
+              if (weatherIdx === null && weatherSource === 'fallback') {
+                reloadWeather();
+                return;
+              }
+              if (weatherIdx === null && weatherSource === 'live') {
+                reloadWeather();
+                return;
+              }
               const next = ((weatherIdx ?? -1) + 1) % ALL_WEATHER_STATES.length;
               setWeatherIdx(next);
             }}
-            title="Tap to cycle weather"
+            title={
+              weatherSource === 'fallback'
+                ? 'Weather unavailable — tap to retry'
+                : weatherSource === 'loading'
+                  ? 'Fetching weather…'
+                  : 'Tap to refresh, long-press to cycle states'
+            }
+            onContextMenu={(e) => {
+              e.preventDefault();
+              const next = ((weatherIdx ?? -1) + 1) % ALL_WEATHER_STATES.length;
+              setWeatherIdx(next);
+            }}
             style={{
               background: weather.tone,
               border: 'none',
@@ -163,8 +201,10 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
               alignItems: 'flex-end',
               gap: 2,
               minWidth: 96,
+              position: 'relative',
               transition: 'background 0.5s cubic-bezier(.2,.9,.2,1), transform 0.35s cubic-bezier(.3,1.3,.4,1)',
               color: PALETTE.ink,
+              opacity: weatherLoading ? 0.75 : 1,
             }}
             onMouseDown={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.95)')}
             onMouseUp={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)')}
@@ -197,6 +237,21 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
             >
               {weather.label}
             </div>
+            {weatherIdx === null && weatherSource === 'fallback' && !weatherLoading && (
+              <span
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  top: 6,
+                  left: 8,
+                  width: 6,
+                  height: 6,
+                  borderRadius: 999,
+                  background: PALETTE.orange,
+                  opacity: 0.9,
+                }}
+              />
+            )}
           </button>
 
           <div
@@ -248,6 +303,7 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
           alignItems: 'center',
           opacity: mounted ? 1 : 0,
           transition: 'all 0.6s cubic-bezier(.2,.9,.2,1) 0.08s',
+          flexShrink: 0,
         }}
       >
         <div
@@ -262,7 +318,7 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
             textTransform: 'uppercase',
           }}
         >
-          {shortDay} {todayNum} {todayMon}
+          {fullDayName}
         </div>
         <div
           style={{
@@ -293,7 +349,8 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
         ref={containerRef}
         style={{
           position: 'relative',
-          height: 540,
+          flex: 1,
+          minHeight: 260,
           marginTop: 0,
           perspective: 1400,
           perspectiveOrigin: '50% 35%',
@@ -323,10 +380,8 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
 
       <div
         style={{
-          position: 'absolute',
-          bottom: 24,
-          left: 0,
-          right: 0,
+          padding: '12px 0 18px',
+          flexShrink: 0,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

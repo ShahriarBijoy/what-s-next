@@ -37,27 +37,34 @@ function mapWmoCode(code: number): WeatherState['id'] {
 
 async function getPosition(): Promise<{ lat: number; lon: number }> {
   if (Capacitor.isNativePlatform()) {
-    // On iOS the plugin handles the permission prompt via Info.plist keys.
-    const perm = await Geolocation.checkPermissions();
-    if (perm.location !== 'granted') {
-      const req = await Geolocation.requestPermissions();
-      if (req.location !== 'granted') {
+    // Plugin handles the permission prompt — on iOS via Info.plist keys, on
+    // Android via ACCESS_COARSE/FINE_LOCATION in the manifest.
+    let perm = await Geolocation.checkPermissions();
+    console.log('[weather] initial location permission:', perm);
+    // On Android the top-level `location` alias can be 'prompt' even when
+    // coarse is already granted, so also accept coarse.
+    const granted = (p: typeof perm) => p.location === 'granted' || p.coarseLocation === 'granted';
+    if (!granted(perm)) {
+      perm = await Geolocation.requestPermissions({ permissions: ['location', 'coarseLocation'] });
+      console.log('[weather] permission after request:', perm);
+      if (!granted(perm)) {
         throw new Error('Location permission denied');
       }
     }
-    const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 10000 });
+    const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 15000, maximumAge: 60_000 });
     return { lat: pos.coords.latitude, lon: pos.coords.longitude };
   }
 
   // Browser fallback — navigator.geolocation also works here but we prefer the
   // unified plugin API so the same code path runs in the dev server.
-  const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 10000 });
+  const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 15000, maximumAge: 60_000 });
   return { lat: pos.coords.latitude, lon: pos.coords.longitude };
 }
 
 // Open-Meteo is keyless and free. Returns Fahrenheit + WMO code + wind.
 export async function fetchWeather(): Promise<WeatherState> {
   const { lat, lon } = await getPosition();
+  console.log('[weather] got position:', lat.toFixed(3), lon.toFixed(3));
   const url =
     `https://api.open-meteo.com/v1/forecast` +
     `?latitude=${lat}&longitude=${lon}` +
@@ -71,6 +78,7 @@ export async function fetchWeather(): Promise<WeatherState> {
   const temp = Math.round(json.current?.temperature_2m ?? 0);
   const code = json.current?.weather_code ?? 3;
   const wind = json.current?.wind_speed_10m ?? 0;
+  console.log('[weather] open-meteo:', { temp, code, wind });
 
   // High winds override — Open-Meteo's WMO codes don't have a plain "windy"
   // bucket, but the design specifically calls for one.

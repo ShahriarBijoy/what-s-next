@@ -27,13 +27,24 @@ export default function App() {
     document.body.style.background = PALETTE.cream;
   }, []);
 
+  // On native we use the real safe-area insets (status bar + gesture bar).
+  // In the desktop preview we fall back to fixed gaps that match the iOS
+  // bezel + home indicator drawn by <IOSDevice />.
+  const safeTop = isNative ? 'calc(env(safe-area-inset-top, 0px) + 12px)' : '58px';
+  const safeBottom = isNative ? 'env(safe-area-inset-bottom, 0px)' : '34px';
+
   const content = (
     <div
       style={{
         background: PALETTE.cream,
-        minHeight: '100%',
+        height: '100%',
+        width: '100%',
         position: 'relative',
-        paddingTop: isNative ? 62 : 58,
+        display: 'flex',
+        flexDirection: 'column',
+        paddingTop: safeTop,
+        paddingBottom: safeBottom,
+        overflow: 'hidden',
       }}
     >
       <div
@@ -42,6 +53,7 @@ export default function App() {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '8px 20px 18px',
+          flexShrink: 0,
         }}
       >
         <SegControl<View>
@@ -55,8 +67,26 @@ export default function App() {
         <PlusButton onClick={() => setCreateOpen(true)} rotate={createOpen} />
       </div>
 
-      <div style={{ position: 'relative' }}>
-        <div key={view} style={{ animation: 'kdFade 0.5s cubic-bezier(.2,.9,.2,1)' }}>
+      <div
+        style={{
+          position: 'relative',
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <div
+          key={view}
+          style={{
+            animation: 'kdFade 0.5s cubic-bezier(.2,.9,.2,1)',
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: view === 'today' ? 'hidden' : 'auto',
+          }}
+        >
           {view === 'today' ? (
             <TodayView
               events={events}

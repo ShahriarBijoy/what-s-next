@@ -12,12 +12,13 @@ export interface CalendarEventsState {
   reload: () => void;
 }
 
-function twoWeekWindow(): { from: Date; to: Date } {
-  const from = new Date();
-  from.setHours(0, 0, 0, 0);
-  from.setDate(from.getDate() - 1);
-  const to = new Date(from);
-  to.setDate(to.getDate() + 14);
+// Cover the three months the Calendar tab can switch between (prev / current /
+// next), plus a day of slack on either side. The Today view still filters down
+// to today + next few days on its own.
+function calendarWindow(): { from: Date; to: Date } {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+  const to = new Date(now.getFullYear(), now.getMonth() + 2, 1, 0, 0, 0, 0);
   return { from, to };
 }
 
@@ -36,7 +37,7 @@ export function useCalendarEvents(): CalendarEventsState {
     let cancelled = false;
     (async () => {
       try {
-        const { from, to } = twoWeekWindow();
+        const { from, to } = calendarWindow();
         const events = await listEvents({ from, to });
         if (cancelled) return;
         if (events.length === 0) {

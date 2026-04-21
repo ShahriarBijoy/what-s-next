@@ -39,6 +39,26 @@ function pickCategory(title: string, loc: string): CategoryId {
   return 'work';
 }
 
+// Category round-trips via a marker in the event's notes, since the underlying
+// OS calendar has no category field. We strip the marker from the notes we
+// show the user so they never see the raw token.
+const VALID_CATS: CategoryId[] = ['work', 'fitness', 'social', 'health', 'fun', 'travel'];
+const CAT_MARKER_RE = /\[kd:cat=([a-z]+)\]/i;
+
+export function encodeCategoryMarker(cat: CategoryId): string {
+  return `[kd:cat=${cat}]`;
+}
+
+function extractCategoryMarker(notes: string | undefined): { cat: CategoryId | null; clean: string | undefined } {
+  if (!notes) return { cat: null, clean: notes };
+  const m = notes.match(CAT_MARKER_RE);
+  if (!m) return { cat: null, clean: notes };
+  const found = m[1].toLowerCase() as CategoryId;
+  const cat = VALID_CATS.includes(found) ? found : null;
+  const clean = notes.replace(CAT_MARKER_RE, '').trim() || undefined;
+  return { cat, clean };
+}
+
 function fmtHM(d: Date): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
@@ -76,7 +96,12 @@ function normalize(raw: RawEvent): CalendarEvent | null {
   const end = new Date(raw.endDate);
   const title = raw.title?.trim() || '(untitled)';
   const loc = raw.location?.trim() || '';
-  const cat = pickCategory(title, loc);
+
+  // An event created through our own UI carries `[kd:cat=…]` in its notes;
+  // honor that before falling back to keyword detection.
+  const rawNotes = (raw.notes || raw.description)?.trim();
+  const { cat: markedCat, clean: cleanNotes } = extractCategoryMarker(rawNotes);
+  const cat = markedCat ?? pickCategory(title, loc);
 
   // Social events rotate through warm tints for visual variety; travel stays
   // navy (dark card); all other categories use their primary tint.
@@ -99,7 +124,7 @@ function normalize(raw: RawEvent): CalendarEvent | null {
     color,
     cat,
     people: 1,
-    notes: (raw.notes || raw.description)?.trim() || undefined,
+    notes: cleanNotes,
     dark,
     dateISO: fmtISODate(start),
   };
