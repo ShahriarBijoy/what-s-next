@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { PALETTE, hexToRgba, type CalendarEvent } from '../types';
 import { useWeather } from '../hooks/useWeather';
 import { ALL_WEATHER_STATES } from '../services/weather';
+import { haptic } from '../services/haptics';
 
 interface Props {
   events: CalendarEvent[];
@@ -45,6 +46,17 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
   useEffect(() => {
     setActive((a) => Math.min(a, Math.max(0, cards.length - 1)));
   }, [cards.length]);
+
+  // Light haptic whenever the user flips to a different card. The `mounted`
+  // gate skips the feedback that would otherwise fire on first render.
+  const firstActiveRef = useRef(true);
+  useEffect(() => {
+    if (firstActiveRef.current) {
+      firstActiveRef.current = false;
+      return;
+    }
+    haptic('tick');
+  }, [active]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -122,13 +134,13 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
           <div
             style={{
               fontFamily: 'JetBrains Mono, monospace',
-              fontSize: 10,
-              letterSpacing: 1.2,
+              fontSize: 12,
+              letterSpacing: 1.3,
               textTransform: 'uppercase',
               color: PALETTE.ink,
               opacity: 0.55,
               fontWeight: 500,
-              marginBottom: 6,
+              marginBottom: 8,
             }}
           >
             Today's events
@@ -136,22 +148,22 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
           <div
             style={{
               fontFamily: 'Instrument Serif, serif',
-              fontSize: 68,
+              fontSize: 92,
               lineHeight: 0.95,
-              letterSpacing: -2,
+              letterSpacing: -2.5,
               color: PALETTE.ink,
               fontWeight: 400,
               display: 'flex',
               alignItems: 'baseline',
-              gap: 12,
+              gap: 14,
             }}
           >
             <span>{todayNum}</span>
             <span
               style={{
-                fontSize: 40,
+                fontSize: 54,
                 fontStyle: 'italic',
-                letterSpacing: -0.8,
+                letterSpacing: -1,
                 color: PALETTE.orange,
                 fontWeight: 400,
               }}
@@ -194,13 +206,13 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
               background: weather.tone,
               border: 'none',
               cursor: 'pointer',
-              borderRadius: 18,
-              padding: '10px 12px',
+              borderRadius: 22,
+              padding: '14px 16px',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'flex-end',
-              gap: 2,
-              minWidth: 96,
+              gap: 4,
+              minWidth: 120,
               position: 'relative',
               transition: 'background 0.5s cubic-bezier(.2,.9,.2,1), transform 0.35s cubic-bezier(.3,1.3,.4,1)',
               color: PALETTE.ink,
@@ -210,28 +222,28 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
             onMouseUp={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)')}
             onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)')}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span
                 key={weather.id}
                 style={{
-                  fontSize: 18,
+                  fontSize: 24,
                   display: 'inline-block',
                   animation: 'kdWx 0.5s cubic-bezier(.3,1.4,.4,1)',
                 }}
               >
                 {weather.icon}
               </span>
-              <span style={{ fontFamily: 'Instrument Serif, serif', fontSize: 22, letterSpacing: -0.3, lineHeight: 1 }}>
+              <span style={{ fontFamily: 'Instrument Serif, serif', fontSize: 30, letterSpacing: -0.3, lineHeight: 1 }}>
                 {weather.temp}°
               </span>
             </div>
             <div
               style={{
                 fontFamily: 'JetBrains Mono, monospace',
-                fontSize: 9,
-                letterSpacing: 0.8,
+                fontSize: 11,
+                letterSpacing: 1,
                 textTransform: 'uppercase',
-                opacity: 0.55,
+                opacity: 0.6,
                 fontWeight: 500,
               }}
             >
@@ -259,14 +271,14 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 6,
-              maxWidth: 180,
+              gap: 7,
+              maxWidth: 200,
               fontFamily: 'JetBrains Mono, monospace',
-              fontSize: 10,
+              fontSize: 11,
               letterSpacing: 0.5,
               textTransform: 'uppercase',
               color: PALETTE.ink,
-              opacity: 0.7,
+              opacity: 0.72,
               fontWeight: 500,
               textAlign: 'right',
               lineHeight: 1.3,
@@ -275,15 +287,15 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
           >
             <span
               style={{
-                width: 14,
-                height: 14,
+                width: 16,
+                height: 16,
                 borderRadius: 999,
                 background: PALETTE.ink,
                 color: '#fff',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 9,
+                fontSize: 10,
                 flexShrink: 0,
                 fontFamily: 'Space Grotesk, system-ui',
               }}
@@ -297,9 +309,9 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
 
       <div
         style={{
-          padding: '10px 24px 0',
+          padding: '14px 24px 0',
           display: 'flex',
-          gap: 8,
+          gap: 10,
           alignItems: 'center',
           opacity: mounted ? 1 : 0,
           transition: 'all 0.6s cubic-bezier(.2,.9,.2,1) 0.08s',
@@ -309,13 +321,14 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
         <div
           style={{
             fontFamily: 'JetBrains Mono, monospace',
-            fontSize: 11,
+            fontSize: 13,
             background: PALETTE.ink,
             color: '#fff',
-            padding: '5px 10px',
+            padding: '7px 14px',
             borderRadius: 999,
             letterSpacing: 1,
             textTransform: 'uppercase',
+            fontWeight: 500,
           }}
         >
           {fullDayName}
@@ -323,9 +336,9 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
         <div
           style={{
             fontFamily: 'JetBrains Mono, monospace',
-            fontSize: 11,
+            fontSize: 13,
             color: PALETTE.ink,
-            opacity: 0.5,
+            opacity: 0.55,
             letterSpacing: 0.8,
           }}
         >
@@ -335,7 +348,7 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
         <div
           style={{
             fontFamily: 'JetBrains Mono, monospace',
-            fontSize: 10,
+            fontSize: 11,
             color: PALETTE.ink,
             opacity: 0.4,
             letterSpacing: 0.5,
@@ -391,72 +404,36 @@ export function TodayView({ events, onOpenEvent, onCreateNew }: Props) {
         }}
       >
         <button
-          onClick={() => setActive((a) => Math.max(0, a - 1))}
-          style={{
-            width: 46,
-            height: 46,
-            borderRadius: 999,
-            background: 'transparent',
-            border: `1.5px dashed ${hexToRgba(PALETTE.ink, 0.35)}`,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14">
-            <path d="M7 12V2M3 6l4-4 4 4" stroke={PALETTE.ink} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-        <button
           onClick={onCreateNew}
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
+            gap: 10,
             background: 'transparent',
             border: 'none',
             cursor: 'pointer',
-            padding: '8px 4px',
+            padding: '10px 6px',
           }}
         >
           <div
             style={{
-              width: 28,
-              height: 28,
+              width: 36,
+              height: 36,
               borderRadius: 999,
               background: PALETTE.ink,
               color: '#fff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 16,
+              fontSize: 20,
               fontWeight: 500,
             }}
           >
             +
           </div>
-          <span style={{ fontFamily: 'Space Grotesk, system-ui', fontSize: 14, fontWeight: 500, color: PALETTE.ink }}>
+          <span style={{ fontFamily: 'Space Grotesk, system-ui', fontSize: 17, fontWeight: 500, color: PALETTE.ink }}>
             New event
           </span>
-        </button>
-        <button
-          onClick={() => setActive((a) => Math.min(cards.length - 1, a + 1))}
-          style={{
-            width: 46,
-            height: 46,
-            borderRadius: 999,
-            background: 'transparent',
-            border: `1.5px dashed ${hexToRgba(PALETTE.ink, 0.35)}`,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14">
-            <path d="M7 2v10M3 8l4 4 4-4" stroke={PALETTE.ink} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
         </button>
       </div>
     </div>
@@ -554,9 +531,6 @@ function StackedCard({ ev, offset, isActive, mounted, onClick }: StackedProps) {
 
   if (abs > 5) opacity = 0;
 
-  const cardWidth = 300;
-  const cardHeight = 180;
-
   return (
     <div
       onClick={onClick}
@@ -566,23 +540,25 @@ function StackedCard({ ev, offset, isActive, mounted, onClick }: StackedProps) {
         position: 'absolute',
         left: '50%',
         top: 0,
-        width: cardWidth,
-        height: cardHeight,
-        marginLeft: -cardWidth / 2,
-        borderRadius: 22,
-        background: ev.color,
-        color: ev.dark ? '#fff' : PALETTE.ink,
-        fontFamily: 'Space Grotesk, system-ui',
-        padding: '18px 20px',
-        boxSizing: 'border-box',
-        cursor: 'pointer',
-        transformStyle: 'preserve-3d',
+        // Responsive width — takes most of the viewport on phones but caps on
+        // tablets/desktop-preview so the card doesn't stretch comically wide.
+        width: 'min(92%, 380px)',
+        aspectRatio: '5 / 3',
         transform: `
+          translate(-50%, 0)
           translate3d(0, ${translateY}px, ${translateZ}px)
           rotateX(${rotateX}deg)
           rotateZ(${rotateZ + (hover && isActive ? 2 : 0)}deg)
           scale(${scale * (mounted ? 1 : 0.92)})
         `,
+        borderRadius: 24,
+        background: ev.color,
+        color: ev.dark ? '#fff' : PALETTE.ink,
+        fontFamily: 'Space Grotesk, system-ui',
+        padding: '22px 24px',
+        boxSizing: 'border-box',
+        cursor: 'pointer',
+        transformStyle: 'preserve-3d',
         opacity: mounted ? opacity : 0,
         transition: 'transform 0.7s cubic-bezier(.2,.9,.25,1), opacity 0.5s cubic-bezier(.2,.9,.2,1)',
         boxShadow: isActive
@@ -607,9 +583,9 @@ function ActiveCardContent({ ev }: { ev: CalendarEvent }) {
           top: 0,
           right: 0,
           fontFamily: 'JetBrains Mono, monospace',
-          fontSize: 10,
+          fontSize: 11,
           background: ev.dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)',
-          padding: '4px 9px',
+          padding: '5px 11px',
           borderRadius: 999,
           letterSpacing: 1,
           textTransform: 'uppercase',
@@ -621,37 +597,37 @@ function ActiveCardContent({ ev }: { ev: CalendarEvent }) {
       <div
         style={{
           fontFamily: 'Instrument Serif, serif',
-          fontSize: 28,
+          fontSize: 34,
           lineHeight: 1.05,
-          letterSpacing: -0.5,
+          letterSpacing: -0.7,
           fontWeight: 400,
-          paddingRight: 68,
+          paddingRight: 80,
         }}
       >
         {ev.title}
       </div>
-      <div style={{ fontSize: 13, opacity: 0.7, marginTop: 4 }}>{ev.loc || '—'}</div>
+      <div style={{ fontSize: 14, opacity: 0.72, marginTop: 6 }}>{ev.loc || '—'}</div>
       <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 9, opacity: 0.6, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 500 }}>Start</div>
-          <div style={{ fontFamily: 'Instrument Serif, serif', fontSize: 40, letterSpacing: -1, lineHeight: 1 }}>{ev.start}</div>
+          <div style={{ fontSize: 10, opacity: 0.6, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 500 }}>Start</div>
+          <div style={{ fontFamily: 'Instrument Serif, serif', fontSize: 48, letterSpacing: -1, lineHeight: 1 }}>{ev.start}</div>
         </div>
         <div
           style={{
             fontFamily: 'JetBrains Mono, monospace',
-            fontSize: 11,
+            fontSize: 12,
             background: ev.dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.1)',
-            padding: '5px 11px',
+            padding: '6px 13px',
             borderRadius: 999,
             fontWeight: 500,
-            marginBottom: 4,
+            marginBottom: 6,
           }}
         >
           {ev.dur}
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 9, opacity: 0.6, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 500 }}>End</div>
-          <div style={{ fontFamily: 'Instrument Serif, serif', fontSize: 40, letterSpacing: -1, lineHeight: 1 }}>{ev.end}</div>
+          <div style={{ fontSize: 10, opacity: 0.6, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 500 }}>End</div>
+          <div style={{ fontFamily: 'Instrument Serif, serif', fontSize: 48, letterSpacing: -1, lineHeight: 1 }}>{ev.end}</div>
         </div>
       </div>
     </div>
@@ -661,24 +637,24 @@ function ActiveCardContent({ ev }: { ev: CalendarEvent }) {
 function InactiveCardContent({ ev, offset }: { ev: CalendarEvent; offset: number }) {
   const abs = Math.abs(offset);
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 42 }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 48 }}>
       <div
         style={{
           fontFamily: 'Instrument Serif, serif',
-          fontSize: 18,
-          letterSpacing: -0.3,
+          fontSize: 22,
+          letterSpacing: -0.4,
           lineHeight: 1.1,
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           flex: 1,
-          marginRight: 12,
+          marginRight: 14,
           opacity: Math.max(1 - abs * 0.1, 0.5),
         }}
       >
         {ev.title}
       </div>
-      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, opacity: 0.65, fontWeight: 500 }}>{ev.start}</div>
+      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, opacity: 0.65, fontWeight: 500 }}>{ev.start}</div>
     </div>
   );
 }

@@ -18,10 +18,10 @@ export function SegControl<T extends string>({ value, onChange, options }: Props
         display: 'inline-flex',
         background: 'rgba(0,0,0,0.06)',
         borderRadius: 999,
-        padding: 4,
+        padding: 5,
         position: 'relative',
         fontFamily: 'Space Grotesk, system-ui',
-        fontSize: 15,
+        fontSize: 17,
         fontWeight: 500,
       }}
     >
@@ -32,7 +32,7 @@ export function SegControl<T extends string>({ value, onChange, options }: Props
             key={o.value}
             onClick={() => onChange(o.value)}
             style={{
-              padding: '8px 18px',
+              padding: '10px 22px',
               borderRadius: 999,
               border: 'none',
               background: on ? PALETTE.ink : 'transparent',

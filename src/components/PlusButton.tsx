@@ -10,8 +10,8 @@ export function PlusButton({ onClick, rotate }: Props) {
     <button
       onClick={onClick}
       style={{
-        width: 44,
-        height: 44,
+        width: 52,
+        height: 52,
         borderRadius: 999,
         background: PALETTE.orange,
         border: 'none',
@@ -24,7 +24,7 @@ export function PlusButton({ onClick, rotate }: Props) {
         transform: rotate ? 'rotate(135deg)' : 'rotate(0deg)',
       }}
     >
-      <svg width="18" height="18" viewBox="0 0 18 18">
+      <svg width="22" height="22" viewBox="0 0 18 18">
         <path d="M9 2v14M2 9h14" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
       </svg>
     </button>

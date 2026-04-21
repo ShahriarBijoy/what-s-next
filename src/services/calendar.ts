@@ -147,6 +147,37 @@ export async function ensureCalendarAccess(): Promise<boolean> {
   }
 }
 
+// Resolve a calendar id to write into. Without this Android creates events in
+// the first writable calendar the plugin finds — which is often an
+// unsynced local calendar, so the event shows up in our app but never lands
+// in Google Calendar / the system calendar app. Preferring the OS's default
+// calendar matches what the stock calendar app does.
+export async function resolveDefaultCalendarId(): Promise<string | undefined> {
+  if (!Capacitor.isNativePlatform()) return undefined;
+  try {
+    const { result } = await CapacitorCalendar.getDefaultCalendar();
+    if (result?.id) {
+      console.log('[calendar] default calendar:', result.title, result.id);
+      return result.id;
+    }
+  } catch (err) {
+    console.warn('[calendar] getDefaultCalendar failed:', err);
+  }
+  // Fall back to the first writable calendar we can see — anything non-local
+  // is usually a synced account (Google/Outlook).
+  try {
+    const { result } = await CapacitorCalendar.listCalendars();
+    const writable = (result ?? []).find((c) => c.allowsContentModifications !== false);
+    if (writable?.id) {
+      console.log('[calendar] fallback calendar:', writable.title, writable.id);
+      return writable.id;
+    }
+  } catch (err) {
+    console.warn('[calendar] listCalendars failed:', err);
+  }
+  return undefined;
+}
+
 export async function listEvents({ from, to }: ListEventsOptions): Promise<CalendarEvent[]> {
   if (!Capacitor.isNativePlatform()) return [];
   const ok = await ensureCalendarAccess();

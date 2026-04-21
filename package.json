@@ -16,6 +16,7 @@
     "@capacitor/android": "^6.2.1",
     "@capacitor/core": "^6.1.2",
     "@capacitor/geolocation": "^6.0.1",
+    "@capacitor/haptics": "^6.0.3",
     "@capacitor/ios": "^6.1.2",
     "@ebarooni/capacitor-calendar": "^6.6.0",
     "react": "^18.3.1",

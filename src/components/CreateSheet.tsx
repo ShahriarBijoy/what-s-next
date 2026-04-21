@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { CapacitorCalendar } from '@ebarooni/capacitor-calendar';
 import { PALETTE, CATEGORIES, CAT_ICON, hexToRgba, type CategoryId } from '../types';
-import { encodeCategoryMarker } from '../services/calendar';
+import { encodeCategoryMarker, resolveDefaultCalendarId } from '../services/calendar';
+import { haptic } from '../services/haptics';
 
 interface Props {
   open: boolean;
@@ -12,10 +13,6 @@ interface Props {
 
 const DAY_PILL_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTH_TITLE = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function sameDate(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
 
 function addDays(base: Date, n: number): Date {
   const d = new Date(base);
@@ -87,12 +84,16 @@ export function CreateSheet({ open, onClose, onCreated }: Props) {
       if (endDate <= startDate) endDate.setTime(startDate.getTime() + 60 * 60 * 1000);
 
       // Create silently — we already collected everything we need via the
-      // custom sheet, no need to bounce through the OS creation UI.
+      // custom sheet, no need to bounce through the OS creation UI. Pin to
+      // the OS default calendar so the event actually appears in the user's
+      // synced calendar app, not a hidden local-only one.
+      const calendarId = await resolveDefaultCalendarId();
       await CapacitorCalendar.createEvent({
         title: cleanTitle,
         startDate: startDate.getTime(),
         endDate: endDate.getTime(),
         notes: encodeCategoryMarker(cat),
+        ...(calendarId ? { calendarId } : {}),
       });
 
       onCreated?.();
@@ -309,7 +310,10 @@ function DateStrip({ selectedOffset, onChange, todayMidnight }: DateStripProps) 
             <button
               key={off}
               data-off={off}
-              onClick={() => onChange(off)}
+              onClick={() => {
+                if (off !== selectedOffset) haptic('tick');
+                onChange(off);
+              }}
               style={{
                 flexShrink: 0,
                 scrollSnapAlign: 'center',
@@ -370,32 +374,44 @@ interface TimeFieldProps {
   minMinutes?: number;
 }
 
+// Wheel geometry — each item is ITEM_H px tall and we show VISIBLE items
+// with the middle one selected. Must stay odd so there's a single centered
+// row to align the highlight bar with.
+const ITEM_H = 40;
+const VISIBLE = 5;
+const PAD_SLOTS = Math.floor(VISIBLE / 2);
+const MINUTES_STEP = 5;
+
+const HOUR_VALUES = Array.from({ length: 12 }, (_, i) => i + 1); // 1..12
+const MINUTE_VALUES = Array.from({ length: 60 / MINUTES_STEP }, (_, i) => i * MINUTES_STEP);
+const AMPM_VALUES = ['AM', 'PM'] as const;
+
 function TimeField({ label, minutes, onChange, minMinutes = 0 }: TimeFieldProps) {
-  const h = Math.floor(minutes / 60);
+  const h24 = Math.floor(minutes / 60);
   const m = minutes % 60;
-  const displayH = ((h + 11) % 12) + 1;
-  const ampm = h < 12 ? 'AM' : 'PM';
+  const displayH = ((h24 + 11) % 12) + 1;
+  // Snap the shown minute to the wheel's step so the highlight always lines
+  // up; the real stored value can be anything.
+  const snappedMin = Math.round(m / MINUTES_STEP) * MINUTES_STEP;
+  const ampm: 'AM' | 'PM' = h24 < 12 ? 'AM' : 'PM';
 
-  const clamp = (v: number) => Math.max(minMinutes, Math.min(23 * 60 + 55, v));
+  const clampMinutes = (v: number) => Math.max(minMinutes, Math.min(23 * 60 + 55, v));
 
-  const stepHour = (delta: number) => onChange(clamp(minutes + delta * 60));
-  const stepMinute = (delta: number) => {
-    // 5-minute increments — enough granularity without making the stepper
-    // tedious to operate.
-    const stepped = Math.round(minutes / 5) * 5 + delta * 5;
-    onChange(clamp(stepped));
+  const setFrom = (h12: number, mm: number, ap: 'AM' | 'PM') => {
+    const h24new = ap === 'AM' ? h12 % 12 : (h12 % 12) + 12;
+    onChange(clampMinutes(h24new * 60 + mm));
   };
 
   return (
     <div
       style={{
         flex: 1,
-        background: 'rgba(255,255,255,0.5)',
-        borderRadius: 18,
-        padding: '10px 14px 12px',
+        background: 'rgba(255,255,255,0.45)',
+        borderRadius: 20,
+        padding: '12px 10px 10px',
         display: 'flex',
         flexDirection: 'column',
-        gap: 4,
+        gap: 6,
       }}
     >
       <div
@@ -405,70 +421,206 @@ function TimeField({ label, minutes, onChange, minMinutes = 0 }: TimeFieldProps)
           textTransform: 'uppercase',
           opacity: 0.6,
           fontWeight: 500,
+          paddingLeft: 4,
         }}
       >
         {label}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-        <Stepper value={displayH} onUp={() => stepHour(1)} onDown={() => stepHour(-1)} />
-        <span style={{ fontFamily: 'Instrument Serif, serif', fontSize: 22, lineHeight: 1, opacity: 0.5 }}>:</span>
-        <Stepper value={String(m).padStart(2, '0')} onUp={() => stepMinute(1)} onDown={() => stepMinute(-1)} />
-        <button
-          onClick={() => onChange(clamp(minutes + (h < 12 ? 12 : -12) * 60))}
+      <div
+        style={{
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'stretch',
+          gap: 2,
+          height: ITEM_H * VISIBLE,
+        }}
+      >
+        {/* Center highlight bar — sits behind the wheel columns and marks
+            the currently-selected row. */}
+        <div
           style={{
-            background: 'transparent',
-            border: `1px solid ${hexToRgba(PALETTE.ink, 0.25)}`,
-            borderRadius: 10,
-            padding: '4px 8px',
-            fontFamily: 'JetBrains Mono, monospace',
-            fontSize: 10,
-            fontWeight: 600,
-            letterSpacing: 1,
-            color: PALETTE.ink,
-            cursor: 'pointer',
+            position: 'absolute',
+            top: ITEM_H * PAD_SLOTS,
+            left: 2,
+            right: 2,
+            height: ITEM_H,
+            borderRadius: 12,
+            background: hexToRgba(PALETTE.ink, 0.08),
+            pointerEvents: 'none',
+          }}
+        />
+        <WheelColumn
+          values={HOUR_VALUES}
+          value={displayH}
+          onChange={(v) => setFrom(v, snappedMin, ampm)}
+          format={(v) => String(v)}
+          align="right"
+        />
+        <div
+          style={{
+            alignSelf: 'center',
+            fontFamily: 'Instrument Serif, serif',
+            fontSize: 26,
+            lineHeight: 1,
+            opacity: 0.5,
+            marginBottom: 2,
           }}
         >
-          {ampm}
-        </button>
+          :
+        </div>
+        <WheelColumn
+          values={MINUTE_VALUES}
+          value={snappedMin}
+          onChange={(v) => setFrom(displayH, v, ampm)}
+          format={(v) => String(v).padStart(2, '0')}
+          align="left"
+        />
+        <WheelColumn
+          values={AMPM_VALUES as unknown as string[]}
+          value={ampm}
+          onChange={(v) => setFrom(displayH, snappedMin, v as 'AM' | 'PM')}
+          format={(v) => String(v)}
+          align="center"
+          monoFont
+        />
       </div>
     </div>
   );
 }
 
-function Stepper({ value, onUp, onDown }: { value: number | string; onUp: () => void; onDown: () => void }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-      <StepperArrow dir="up" onClick={onUp} />
-      <div style={{ fontFamily: 'Instrument Serif, serif', fontSize: 24, letterSpacing: -0.3, lineHeight: 1, minWidth: 24, textAlign: 'center' }}>
-        {value}
-      </div>
-      <StepperArrow dir="down" onClick={onDown} />
-    </div>
-  );
+interface WheelColumnProps<T extends string | number> {
+  values: T[];
+  value: T;
+  onChange: (v: T) => void;
+  format: (v: T) => string;
+  align?: 'left' | 'center' | 'right';
+  monoFont?: boolean;
 }
 
-function StepperArrow({ dir, onClick }: { dir: 'up' | 'down'; onClick: () => void }) {
+function WheelColumn<T extends string | number>({
+  values,
+  value,
+  onChange,
+  format,
+  align = 'center',
+  monoFont,
+}: WheelColumnProps<T>) {
+  const ref = useRef<HTMLDivElement>(null);
+  const settleRef = useRef<number | undefined>(undefined);
+  const lastCommittedIdxRef = useRef<number>(-1);
+  // Visual index = which row the highlight bar is currently over. Updated
+  // on every scroll event so we can fire a haptic tick the instant a new
+  // value crosses the selection line (the iOS rolling-click feel).
+  const lastVisualIdxRef = useRef<number>(-1);
+
+  const indexOfValue = (v: T) => {
+    const i = values.indexOf(v);
+    return i === -1 ? 0 : i;
+  };
+
+  // Keep the wheel synced to the external value — runs on mount and whenever
+  // the prop changes from elsewhere (e.g. start-time bump shifting end).
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const i = indexOfValue(value);
+    // Avoid fighting the user's in-flight scroll.
+    if (lastCommittedIdxRef.current === i) return;
+    const target = i * ITEM_H;
+    if (Math.abs(el.scrollTop - target) < 2) return;
+    el.scrollTo({ top: target, behavior: 'auto' });
+    lastCommittedIdxRef.current = i;
+    lastVisualIdxRef.current = i;
+  }, [value, values]);
+
+  const handleScroll = () => {
+    const el = ref.current;
+    if (!el) return;
+
+    // Haptic tick whenever a new value passes under the highlight bar, so
+    // a swipe produces "click-click-click" like an iOS picker. This runs on
+    // every scroll event (not debounced), so it feels live.
+    const visualIdx = Math.max(0, Math.min(values.length - 1, Math.round(el.scrollTop / ITEM_H)));
+    if (visualIdx !== lastVisualIdxRef.current) {
+      if (lastVisualIdxRef.current >= 0) haptic('tick');
+      lastVisualIdxRef.current = visualIdx;
+    }
+
+    if (settleRef.current) window.clearTimeout(settleRef.current);
+    // Debounce the *commit* separately from the tick: wait for scroll to
+    // settle, then snap precisely to the nearest value and emit onChange.
+    settleRef.current = window.setTimeout(() => {
+      const raw = el.scrollTop / ITEM_H;
+      const idx = Math.max(0, Math.min(values.length - 1, Math.round(raw)));
+      const snapped = idx * ITEM_H;
+      if (Math.abs(el.scrollTop - snapped) > 0.5) {
+        el.scrollTo({ top: snapped, behavior: 'smooth' });
+      }
+      if (idx !== lastCommittedIdxRef.current) {
+        lastCommittedIdxRef.current = idx;
+        const next = values[idx];
+        if (next !== value) onChange(next);
+      }
+    }, 120);
+  };
+
+  const textAlign = align === 'left' ? 'flex-start' : align === 'right' ? 'flex-end' : 'center';
+  const paddingX = align === 'center' ? 6 : 10;
+
   return (
-    <button
-      onClick={onClick}
-      aria-label={dir === 'up' ? 'increase' : 'decrease'}
+    <div
+      ref={ref}
+      onScroll={handleScroll}
       style={{
-        background: 'transparent',
-        border: 'none',
-        padding: 2,
-        cursor: 'pointer',
-        color: PALETTE.ink,
-        opacity: 0.6,
-        lineHeight: 0,
+        flex: 1,
+        height: ITEM_H * VISIBLE,
+        overflowY: 'auto',
+        scrollSnapType: 'y mandatory',
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
+        touchAction: 'pan-y',
+        position: 'relative',
       }}
     >
-      <svg width="12" height="8" viewBox="0 0 12 8">
-        {dir === 'up' ? (
-          <path d="M1 6l5-5 5 5" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        ) : (
-          <path d="M1 2l5 5 5-5" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        )}
-      </svg>
-    </button>
+      <div style={{ paddingTop: ITEM_H * PAD_SLOTS, paddingBottom: ITEM_H * PAD_SLOTS }}>
+        {values.map((v, i) => {
+          const on = v === value;
+          // Gentle fall-off so far-away rows feel out of focus without
+          // disappearing entirely.
+          const dist = Math.abs(i - indexOfValue(value));
+          const opacity = on ? 1 : Math.max(0.2, 0.7 - dist * 0.18);
+          return (
+            <div
+              key={String(v)}
+              onClick={() => {
+                const el = ref.current;
+                if (!el) return;
+                el.scrollTo({ top: i * ITEM_H, behavior: 'smooth' });
+              }}
+              style={{
+                height: ITEM_H,
+                scrollSnapAlign: 'center',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: textAlign,
+                padding: `0 ${paddingX}px`,
+                fontFamily: monoFont ? 'JetBrains Mono, monospace' : 'Instrument Serif, serif',
+                fontSize: monoFont ? 14 : 28,
+                fontWeight: monoFont ? 600 : 400,
+                letterSpacing: monoFont ? 1 : -0.3,
+                lineHeight: 1,
+                color: PALETTE.ink,
+                opacity,
+                transition: 'opacity 0.2s',
+                cursor: 'pointer',
+                userSelect: 'none',
+              }}
+            >
+              {format(v)}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
