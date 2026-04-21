@@ -1,0 +1,32 @@
+# deps
+node_modules/
+
+# builds
+dist/
+*.tsbuildinfo
+.tsbuild-node/
+
+# editor
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# env
+.env
+.env.local
+
+# iOS
+ios/App/App/public/
+ios/App/Pods/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+ios/App/App.xcodeproj/project.xcworkspace/xcuserdata/
+ios/DerivedData/
+ios/build/
+ios/App/Package.resolved
