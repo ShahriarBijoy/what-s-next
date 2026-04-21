@@ -31,6 +31,9 @@ native status bar, native permission dialogs.
 | Weather           | Open-Meteo HTTPS API (free, no key)                         |
 | App chrome        | iOS native status bar + home indicator                      |
 
+Plugins work on Android too — the same `calendar.ts` / `weather.ts` code runs
+unchanged on both platforms.
+
 ## Project layout
 
 ```
@@ -42,6 +45,7 @@ native status bar, native permission dialogs.
 │   ├── data/               fallback sample schedule for web preview
 │   └── types.ts            palette, enums, small helpers
 ├── ios/                    Capacitor-generated Xcode project
+├── android/                Capacitor-generated Android Studio project
 ├── capacitor.config.ts     app id, web dir
 ├── vite.config.ts
 └── index.html
@@ -112,15 +116,76 @@ server: { url: 'http://<your-mac-lan-ip>:5173', cleartext: true }
 
 Then run `npm run dev` on the Mac and `cap sync` + run from Xcode.
 
+## Build for Android (works on Windows)
+
+You don't need a Mac for Android — Android Studio runs on Windows, macOS, and
+Linux.
+
+### One-time setup
+
+1. Install **Android Studio** (includes the Android SDK + emulator):
+   https://developer.android.com/studio
+2. During first launch, accept all SDK license prompts.
+3. Install **JDK 21** if Android Studio doesn't bundle it. Point
+   `JAVA_HOME` at it if needed.
+4. (Optional) Add `platform-tools` to `PATH` so `adb` works from any terminal.
+
+### Build & run
+
+From the project root:
+
+```bash
+npm install
+npm run build
+npx cap sync android
+npx cap open android     # opens Android Studio
+```
+
+In Android Studio:
+
+1. Let Gradle finish indexing (first open takes a few minutes).
+2. Either plug in a phone with **USB debugging enabled**, or start an emulator
+   from **Device Manager** → `+` → pick a Pixel image.
+3. Hit the green ▶︎ button. The app installs and launches.
+
+Or skip Android Studio entirely and run from the CLI once a device/emulator
+is connected:
+
+```bash
+npm run android:run    # build + sync + cap run android
+```
+
+`cap run android` will list attached devices/emulators and install to the
+one you pick.
+
+### Android quirks to know
+
+- The `com.kaleidar.app` package id is already set in `capacitor.config.ts`
+  and matches `android/app/build.gradle`.
+- First run asks for Calendar then Location permissions — both show the
+  native Android system dialog.
+- On emulators without a calendar account configured, `listEventsInRange`
+  returns an empty list and the UI falls back to the prototype sample data.
+  Add a Google account in emulator Settings → Accounts to see real events.
+- Emulator location defaults to Mountain View, CA. Use the emulator
+  Extended Controls → Location tab to set a different one before testing
+  weather.
+- `backdrop-filter` (the liquid-glass status pills) needs Chrome 76+ — every
+  modern Android WebView supports it.
+
 ## Permissions
 
-The Info.plist already declares everything needed. iOS will show the native
-prompt the first time each is triggered:
+### iOS (`ios/App/App/Info.plist`)
 
 - `NSCalendarsUsageDescription` — EventKit read (iOS < 17)
 - `NSCalendarsFullAccessUsageDescription` — EventKit read+write (iOS 17+)
 - `NSCalendarsWriteOnlyAccessUsageDescription` — EventKit write-only (iOS 17+)
 - `NSLocationWhenInUseUsageDescription` — CoreLocation foreground
+
+### Android (`android/app/src/main/AndroidManifest.xml`)
+
+- `READ_CALENDAR`, `WRITE_CALENDAR`
+- `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`
 
 If the user denies a permission, the app degrades gracefully:
 
