@@ -1,4 +1,4 @@
-# Kaleidar — iOS app
+# what's next — iOS app
 
 Native iOS app built from the Kaleidar Claude Design prototype. Uses
 **Capacitor** to ship the React/TypeScript UI inside a WKWebView while talking
